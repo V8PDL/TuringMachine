@@ -7,18 +7,9 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
     <Grid>
-        <DataGrid
-            Name="VisibleTapeGrid" 
-            HorizontalAlignment="Stretch" 
-            Width="50" Margin="50,50,50,0"
-            VerticalAlignment="Top"
-            HeadersVisibility="None"
-            AutoGenerateColumns="False"
-            CanUserAddRows="False"
-            CanUserDeleteRows="False"
-            CanUserResizeColumns="False"
-            CanUserSortColumns="False"
-            CellEditEnding="VisibleTapeGrid_CellEditEnding">
+        <DataGrid Name="VisibleTapeGrid" HorizontalAlignment="Stretch" Width="50" Margin="50,50,50,0" VerticalAlignment="Top" HeadersVisibility="None"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeColumns="False" CanUserSortColumns="False"
+                  CellEditEnding="VisibleTapeGrid_CellEditEnding">
             <DataGrid.LayoutTransform>
                 <TransformGroup>
                     <RotateTransform Angle="90"/>
@@ -59,19 +50,10 @@
                 </Style>
             </DataGrid.RowStyle>
         </DataGrid>
-        <Button Name="ToLeftButton" Click="ToLeftButton_Click" Content="&lt;" FontSize="32" HorizontalAlignment="Left" Margin="10,50,0,0" VerticalAlignment="Top" Width="35" Height="50"/>
-        <Button Name="ToRightButton" Click="ToRightButton_Click" Content="&gt;" FontSize="32" HorizontalAlignment="Right" Margin="100,50,10,0" VerticalAlignment="Top" Width="35" Height="50"/>
-        <DataGrid Name="RulesGrid" 
-                  HorizontalAlignment="Stretch"
-                  Margin="10,140,10,50"
-                  VerticalAlignment="Stretch"
-                  CellEditEnding="RulesGrid_CellEditEnding"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  CanUserReorderColumns="True"
-                  CanUserDeleteRows="False"
-                  CanUserResizeColumns="True"
-                  CanUserSortColumns="False">
+        <Button x:Name="ToLeftButton" Click="ToLeftButton_Click" Content="&lt;" FontSize="32" HorizontalAlignment="Left" Margin="10,50,0,0" VerticalAlignment="Top" Width="35" Height="50"/>
+        <Button x:Name="ToRightButton" Click="ToRightButton_Click" Content="&gt;" FontSize="28" HorizontalAlignment="Right" Margin="100,50,10,0" VerticalAlignment="Top" Width="35" Height="50"/>
+        <DataGrid Name="RulesGrid" HorizontalAlignment="Stretch" Margin="10,140,10,50" VerticalAlignment="Stretch" CellEditEnding="RulesGrid_CellEditEnding"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserReorderColumns="True" CanUserDeleteRows="False" CanUserResizeColumns="True" CanUserSortColumns="False">
             <DataGrid.RowHeaderStyle>
                 <Style TargetType="DataGridRowHeader">
                     <Setter Property="Template">
@@ -90,8 +72,8 @@
         <Button x:Name="AddStateButton" Content="Add state" HorizontalAlignment="Left" Margin="10,0,0,10" VerticalAlignment="Bottom" Width="75" Click="AddStateButton_Click"/>
         <Button x:Name="RemoveStateButton" Content="Remove state" HorizontalAlignment="Left" Margin="100,0,0,10" VerticalAlignment="Bottom" Width="75" Click="RemoveStateButton_Click"/>
         <Button x:Name="RemoveRuleButton" Content="Remove rule" HorizontalAlignment="Right" Margin="0,0,100,10" VerticalAlignment="Bottom" Width="75" Click="RemoveRuleButton_Click" />
-        <Button x:Name="StartButton" Content="Start" HorizontalAlignment="Center" Margin="0,0,170,10" VerticalAlignment="Bottom" Width="75" Click="StartButton_Click"/>
-        <Button x:Name="StopButton" Content="Stop" HorizontalAlignment="Center" Margin="170,0,0,10" VerticalAlignment="Bottom" Width="75" Click="StopButton_Click"/>
-        <Button x:Name="DebugButton" Content="&gt;" HorizontalAlignment="Center" Margin="40,0,0,10" VerticalAlignment="Bottom" Width="30" Click="DebugButton_Click"/>
+        <Button x:Name="StartButton" Content="Start" HorizontalAlignment="Center" Margin="0,0,120,10" VerticalAlignment="Bottom" Width="75" Click="StartButton_Click"/>
+        <Button x:Name="StopButton" Content="Stop" HorizontalAlignment="Center" Margin="120,0,0,10" VerticalAlignment="Bottom" Width="75" Click="StopButton_Click"/>
+        <Button x:Name="DebugButton" Content="&gt;" HorizontalAlignment="Center" Margin="0,0,0,10" VerticalAlignment="Bottom" Width="30" Click="DebugButton_Click"/>
     </Grid>
 </Window>

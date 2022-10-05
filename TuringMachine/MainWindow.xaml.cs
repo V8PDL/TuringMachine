@@ -9,9 +9,6 @@ using System.Windows.Data;
 
 namespace TuringMachine
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
         #region Fields
@@ -141,7 +138,7 @@ namespace TuringMachine
                 {
                     this.Direction = direction;
                     this.NewState = newState;
-                    this.NewValue = data[0];
+                    this.NewValue = data[0].Trim();
                     return true;
                 }
                 return false;
@@ -159,6 +156,11 @@ namespace TuringMachine
 
         #endregion
 
+        /// <summary>
+        /// Get char separator for enum
+        /// </summary>
+        /// <param name="changePosition"></param>
+        /// <returns>Char separator</returns>
         public static char GetEnumChar(MoveDirection changePosition)
         {
             switch (changePosition)
@@ -190,11 +192,14 @@ namespace TuringMachine
             }
             RulesGrid.ItemsSource = Rules;
             AddStateButton_Click(null, null);
-            AddRule(string.Empty);
+            Rules.Add(new Rule(string.Empty, StatesCount));
         }
 
         public void ToLeftButton_Click(object sender, RoutedEventArgs e) => MoveLeft();
 
+        /// <summary>
+        /// Moves tape to left
+        /// </summary>
         private void MoveLeft()
         {
             var value = string.Empty;
@@ -218,6 +223,9 @@ namespace TuringMachine
 
         public void ToRightButton_Click(object sender, RoutedEventArgs e) => MoveRight();
 
+        /// <summary>
+        /// Moves tape to right
+        /// </summary>
         private void MoveRight()
         {
             var value = string.Empty;
@@ -241,6 +249,11 @@ namespace TuringMachine
             VisibleTapeGrid.ItemsSource = ColumnsCollection;
         }
 
+        /// <summary>
+        /// Redefine cell editing to actualize all arrays
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         public void RulesGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
             if ((e?.EditingElement) is TextBox tb)
@@ -259,6 +272,11 @@ namespace TuringMachine
             }
         }
 
+        /// <summary>
+        /// Prompt for string value before <see cref="AddRule(string)"/>
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         public void AddRuleButton_Click(object sender, RoutedEventArgs e)
         {
             var promptDialog = new PromptDialog();
@@ -268,9 +286,14 @@ namespace TuringMachine
             {
                 return;
             }
-            AddRule(promptDialog.ResponseText);
+            Rules.Add(new Rule(promptDialog.ResponseText, StatesCount));
         }
 
+        /// <summary>
+        /// Initialize new column for state 'Q{N}' - N - number of columns, set binding and add <see cref="Move"/> to all <see cref="Rule"/>s
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         public void AddStateButton_Click(object sender, RoutedEventArgs e)
         {
             var column = new DataGridTextColumn();
@@ -287,6 +310,11 @@ namespace TuringMachine
             StatesCount++;
         }
 
+        /// <summary>
+        /// Remove <see cref="Move"/> from all <see cref="Rule"/>s, reinitialize binding (or it'll work strange)
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void RemoveStateButton_Click(object sender, RoutedEventArgs e)
         {
             var selectedCells = RulesGrid.SelectedCells;
@@ -313,6 +341,11 @@ namespace TuringMachine
             }
         }
 
+        /// <summary>
+        /// Just remove from array
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void RemoveRuleButton_Click(object sender, RoutedEventArgs e)
         {
             var selectedRule = RulesGrid.SelectedIndex;
@@ -322,15 +355,38 @@ namespace TuringMachine
             }
         }
 
-        public void AddRule(string value) => Rules.Add(new Rule(value, StatesCount));
-
         public void StartButton_Click(object sender, RoutedEventArgs e) => new Thread(Play).Start();
 
+        /// <summary>
+        /// Change enability and/or <see cref="MoveNext"/>
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void DebugButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!isRunning)
+            {
+                ChangeEnability();
+                DebugButton.IsEnabled = true;
+                StopButton.IsEnabled = false;
+                Tape.currentState = 1;
+            }
+            else if (Tape.currentState == 0)
+            {
+                ChangeEnability();
+                MessageBox.Show("Program executed!");
+                return;
+            }
+            MoveNext();
+        }
+
+        /// <summary>
+        /// Move next with intervals of 400 ms
+        /// </summary>
         private void Play()
         {
             Tape.currentState = 1;
             this.Dispatcher.Invoke(() => DebugButton.IsEnabled = false);
-            isRunning = true;
             this.Dispatcher.Invoke(() => ChangeEnability());
             while (Tape.currentState != 0)
             {
@@ -344,20 +400,22 @@ namespace TuringMachine
                     break;
                 }
             }
-            isRunning = false;
-            MessageBox.Show("Programm executed");
-            this.Dispatcher.Invoke(() => DebugButton.IsEnabled = true);
+            this.Dispatcher.Invoke(() => MessageBox.Show("Programm executed!"));
             this.Dispatcher.Invoke(() => ChangeEnability());
+            this.Dispatcher.Invoke(() => DebugButton.IsEnabled = true);
         }
 
+        /// <summary>
+        /// Moves on current <see cref="Rule"/>'s <see cref="Move"/> (gets from state):
+        /// (\w+ (&lt;|&gt;|.) \d+) - \w+ - value set in current cell; '&lt;', '.', '&gt;' - where to move, \d+ - what is next state
+        /// </summary>
         private void MoveNext()
         {
-            var currentSymbol = Tape[Tape.start];
+            var currentSymbol = Tape[Tape.start].Trim();
             var currentRule = Rules.FirstOrDefault(r => r.Symbol == currentSymbol) ?? Rules.FirstOrDefault(r => r.Symbol == string.Empty);
             if (currentRule == null)
             {
                 Tape.currentState = 0;
-                ChangeEnability();
                 return;
             }
             var currentMove = currentRule.Moves[Tape.currentState - 1];
@@ -372,15 +430,17 @@ namespace TuringMachine
                 case MoveDirection.Right:
                     MoveRight();
                     break;
-                case MoveDirection.None:
-                    break;
                 default:
                     break;
             }
         }
 
+        /// <summary>
+        /// Disable/enable all dependent on state (running or not) controls
+        /// </summary>
         private void ChangeEnability()
         {
+            isRunning = !isRunning;
             StartButton.IsEnabled = !isRunning;
             DebugButton.IsEnabled = !isRunning;
             RulesGrid.IsReadOnly = isRunning;
@@ -391,29 +451,10 @@ namespace TuringMachine
             RemoveStateButton.IsEnabled = !isRunning;
             ToLeftButton.IsEnabled = !isRunning;
             ToRightButton.IsEnabled = !isRunning;
+            StopButton.IsEnabled = isRunning;
         }
 
-        private void StopButton_Click(object sender, RoutedEventArgs e)
-        {
-            isRunning = false;
-            ChangeEnability();
-        }
-
-        private void DebugButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (!isRunning)
-            {
-                isRunning = true;
-                ChangeEnability();
-                Tape.currentState = 1;
-            }
-            else if (Tape.currentState == 0)
-            {
-                MessageBox.Show("Program executed");
-                return;
-            }
-            MoveNext();
-        }
+        private void StopButton_Click(object sender, RoutedEventArgs e) => ChangeEnability();
 
         private void VisibleTapeGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
