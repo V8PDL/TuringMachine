@@ -1,7 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Data;
 using System.Linq;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -15,23 +16,17 @@ namespace TuringMachine
     {
         #region Fields
 
-        public const int capacity = 15;
+        public ObservableCollection<List<Cell>> ColumnsCollection { get; set; }
 
-        public static int movesCount = 0;
+        public const int tapeCapacity = 15;
 
-        public static int statesCount = 0;
-
-        ObservableCollection<List<Move>> Moves { get; set; } = new ObservableCollection<List<Move>>();
-
-        public ObservableCollection<Cell> VisibleTapeFragment { get; set; }
+        public static int StatesCount = 0;
 
         public ObservableCollection<Rule> Rules { get; set; }
-        public static ObservableCollection<string> VisibleTape { get => visibleTape; set => visibleTape = value; }
-        public CellsTape Tape { get => tape; set => tape = value; }
 
-        private static ObservableCollection<string> visibleTape;
+        public CellsTape Tape { get; set; }
 
-        private CellsTape tape;
+        private bool isRunning = false;
 
         #endregion
 
@@ -39,29 +34,32 @@ namespace TuringMachine
 
         public class CellsTape
         {
-            public ObservableCollection<Cell> visibleTapeFragment;
             public int start;
             public int finish;
-            public List<Cell> tape;
+            public List<string> tape;
+            public int currentState = 1;
 
-            public CellsTape(ObservableCollection<Cell> visibleTapeFragment)
+            public List<string> VisibleTapeFragment { get; set; }
+
+            public CellsTape(List<string> visibleTapeFragment)
             {
                 this.start = 0;
-                this.finish = capacity;
-                this.visibleTapeFragment = visibleTapeFragment;
-                this.tape = new List<Cell>(this.visibleTapeFragment);
+                this.finish = tapeCapacity;
+                this.VisibleTapeFragment = new List<string>(visibleTapeFragment);
+                this.tape = new List<string>(visibleTapeFragment);
+            }
+
+            public string this[int i]
+            {
+                get => this.tape[i];
+                set => this.tape[i] = value;
             }
         }
 
         public class Cell
         {
-            public string value;
-            public string Value
-            {
-                get { return this.value; }
-                set { this.value = value; }
-            }
-            public Cell() => Value = "";
+            public string Value { get; set; }
+            public Cell() => Value = string.Empty;
             public Cell(string val) => Value = val;
         }
 
@@ -70,33 +68,58 @@ namespace TuringMachine
             public string Symbol { get; set; }
             public List<Move> Moves { get; set; }
 
-            public Rule(string symbol)
+            public ObservableCollection<string> RawMoves { get; set; }
+
+            /// <summary>
+            /// Set symbol and init capacity moves
+            /// </summary>
+            /// <param name="symbol"></param>
+            /// <param name="capacity"></param>
+            public Rule(string symbol, int capacity)
             {
                 this.Symbol = symbol;
-                this.Moves = new List<Move>();
-                this.Moves.Add(new Move(0, symbol));
-            }
-
-            public string this[int i]
-            {
-                get => this.Moves[i].RawValue;
+                this.Moves = Enumerable.Range(0, capacity).Select(r => new Move(r + 1, symbol)).ToList();
+                this.RawMoves = new ObservableCollection<string>(this.Moves.Select(m => m.ToString()));
             }
         }
 
         public class Move
         {
-            public string rawValue;
-
             public string RawValue { get; set; }
             public string NewValue { get; set; }
+            public string Symbol { get; set; }
             public MoveDirection Direction { get; set; }
             public int NewState { get; set; }
             public int CurrentState { get; set; }
 
-            public Move(int currentState, string rawValue)
+            /// <summary>
+            /// Set state, symbol and try set value
+            /// </summary>
+            /// <param name="currentState"></param>
+            /// <param name="Symbol"></param>
+            /// <param name="rawValue"></param>
+            public Move(int currentState, string Symbol, string rawValue)
+            {
+                this.Symbol = Symbol;
+                this.CurrentState = currentState;
+                this.NewValue = Symbol;
+                this.TrySetRawValue(rawValue);
+            }
+
+            /// <summary>
+            /// Set state, symbol. Value = string.Empty
+            /// </summary>
+            /// <param name="currentState"></param>
+            /// <param name="Symbol"></param>
+            public Move(int currentState, string Symbol)
             {
                 this.CurrentState = currentState;
-                this.TrySetRawValue(rawValue);
+                this.Symbol = Symbol;
+                this.Direction = MoveDirection.None;
+                this.NewValue = string.Empty;
+                this.NewState = currentState;
+                this.NewValue = Symbol;
+                this.RawValue = string.Empty;
             }
 
             public bool TrySetRawValue(string rawValue)
@@ -104,7 +127,7 @@ namespace TuringMachine
                 this.RawValue = rawValue;
                 if (!this.ParseOnDirection(MoveDirection.Left) && !this.ParseOnDirection(MoveDirection.Right) && !this.ParseOnDirection(MoveDirection.None))
                 {
-                    this.rawValue = "";
+                    this.RawValue = string.Empty;
                     return false;
                 }
                 return true;
@@ -113,27 +136,18 @@ namespace TuringMachine
             public bool ParseOnDirection(MoveDirection direction)
             {
                 var directionChar = GetEnumChar(direction);
-                var data = this.RawValue.Split(directionChar);
-                if (data.Length == 2 && int.TryParse(data[1], out var newState) && newState <= statesCount)
+                var data = (" " + this.RawValue).Split(directionChar);
+                if (data.Length == 2 && int.TryParse(data[1], out var newState) && newState <= StatesCount)
                 {
                     this.Direction = direction;
                     this.NewState = newState;
-                    this.NewValue = data[1];
+                    this.NewValue = data[0];
                     return true;
                 }
                 return false;
             }
 
-            public Move(int currentState)
-            {
-                this.CurrentState = currentState;
-                this.Direction = MoveDirection.None;
-                this.NewValue = "";
-                this.NewState = currentState;
-                this.RawValue = "";
-            }
-
-            public override string ToString() => $"{this.NewValue} {GetEnumChar(this.Direction)} {this.NewState}";
+            public override string ToString() => $" {this.NewValue} {GetEnumChar(this.Direction)} {this.NewState} ";
         }
 
         public enum MoveDirection
@@ -164,32 +178,88 @@ namespace TuringMachine
         {
             InitializeComponent();
 
-            VisibleTapeFragment = new ObservableCollection<Cell>(Enumerable.Repeat(new Cell("123"), capacity));
-
             Rules = new ObservableCollection<Rule>();
-            Tape = new CellsTape(VisibleTapeFragment);
+            Tape = new CellsTape(new List<string>(Enumerable.Repeat(string.Empty, tapeCapacity)));
+            ColumnsCollection = new ObservableCollection<List<Cell>>(Enumerable.Repeat(new List<Cell>() { new Cell(string.Empty) }, tapeCapacity));
 
-            VisibleTapeGrid.ItemsSource = VisibleTapeFragment;
+           VisibleTapeGrid.ItemsSource = ColumnsCollection;
+            foreach (DataGridTextColumn c in VisibleTapeGrid.Columns)
+            {
+                c.IsReadOnly = false;
+                c.Binding = new Binding("Value") { Mode = BindingMode.TwoWay };
+            }
             RulesGrid.ItemsSource = Rules;
-            AddRule("");
-            AddRuleButton_Click(null, null);
+            AddStateButton_Click(null, null);
+            AddRule(string.Empty);
+        }
+
+        public void ToLeftButton_Click(object sender, RoutedEventArgs e) => MoveLeft();
+
+        private void MoveLeft()
+        {
+            var value = string.Empty;
+            if (Tape.start != 0)
+            {
+                value = Tape.tape[Tape.start - 1];
+                Tape.start--;
+                Tape.finish--;
+            }
+            else
+            {
+                Tape.tape.Insert(0, value);
+            }
+            
+            Tape.VisibleTapeFragment.Insert(0, value);
+            Tape.VisibleTapeFragment.RemoveAt(tapeCapacity);
+            ColumnsCollection.Insert(0, new List<Cell>() { new Cell(value) });
+            ColumnsCollection.RemoveAt(tapeCapacity);
+            VisibleTapeGrid.ItemsSource = ColumnsCollection;
+        }
+
+        public void ToRightButton_Click(object sender, RoutedEventArgs e) => MoveRight();
+
+        private void MoveRight()
+        {
+            var value = string.Empty;
+            if (Tape.finish != Tape.tape.Count)
+            {
+                value = Tape.tape[Tape.finish];
+            }
+            else
+            {
+                Tape.tape.Add(value);
+            }
+
+            Tape.tape.Add(value);
+            Tape.VisibleTapeFragment.Add(value);
+            Tape.VisibleTapeFragment.RemoveAt(0);
+            Tape.start++;
+            Tape.finish++;
+
+            ColumnsCollection.Add(new List<Cell>() { new Cell(value) });
+            ColumnsCollection.RemoveAt(0);
+            VisibleTapeGrid.ItemsSource = ColumnsCollection;
+        }
+
+        public void RulesGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+            if ((e?.EditingElement) is TextBox tb)
+            {
+                var x = e.Column.DisplayIndex;
+                var y = e.Row.GetIndex();
+                var newText = tb.Text;
+
+                var currentMove = Rules[y].Moves[x];
+                if (!currentMove.TrySetRawValue(newText))
+                {
+                    MessageBox.Show("Wrong value");
+                    e.Cancel = true;
+                }
+                Rules[y].RawMoves[x] = currentMove.ToString();
+            }
         }
 
         public void AddRuleButton_Click(object sender, RoutedEventArgs e)
-        {
-            var column = new DataGridTextColumn();
-            column.Header = $"Q{movesCount + 1}";
-            column.IsReadOnly = false;
-            column.Binding = new Binding(string.Format("[{0}]", movesCount));
-            foreach (var rule in Rules)
-            {
-                rule.Moves.Add(new Move(movesCount));
-            }
-            RulesGrid.Columns.Add(column);
-            movesCount++;
-        }
-
-        public void AddStateButton_Click(object sender, RoutedEventArgs e)
         {
             var promptDialog = new PromptDialog();
             if (promptDialog.ShowDialog() != true
@@ -201,68 +271,159 @@ namespace TuringMachine
             AddRule(promptDialog.ResponseText);
         }
 
-        public void AddRule(string value)
+        public void AddStateButton_Click(object sender, RoutedEventArgs e)
         {
-            var newRule = new Rule(value);
-            Rules.Add(newRule);
-            Moves.Add(newRule.Moves);
-            statesCount++;
+            var column = new DataGridTextColumn();
+            column.Header = $"Q{StatesCount + 1}";
+            column.IsReadOnly = false;
+            column.Binding = new Binding(string.Format("RawMoves[{0}]", StatesCount));
+            foreach (var rule in Rules)
+            {
+                var newMove = new Move(StatesCount + 1, rule.Symbol);
+                rule.Moves.Add(newMove);
+                rule.RawMoves.Add(newMove.ToString());
+            }
+            RulesGrid.Columns.Add(column);
+            StatesCount++;
         }
 
-        public void StartButton_Click(object sender, RoutedEventArgs e)
+        private void RemoveStateButton_Click(object sender, RoutedEventArgs e)
         {
+            var selectedCells = RulesGrid.SelectedCells;
+            if (selectedCells.Any() && Rules.Count > 1)
+            {
+                var index = selectedCells.First().Column.DisplayIndex;
+                foreach (var rule in Rules)
+                {
+                    if (rule.Moves.Count < index)
+                    {
+                        return;
+                    }
+                    rule.Moves.RemoveAt(index);
+                    rule.RawMoves.RemoveAt(index);
+                }
+                RulesGrid.Columns.RemoveAt(index);
+                StatesCount--;
 
+                foreach (DataGridTextColumn column in RulesGrid.Columns)
+                {
+                    column.Header = $"Q{column.DisplayIndex + 1}";
+                    column.Binding = new Binding(string.Format("RawMoves[{0}]", column.DisplayIndex));
+                }
+            }
         }
 
-        public void ToLeftButton_Click(object sender, RoutedEventArgs e)
+        private void RemoveRuleButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Tape.start == 0)
+            var selectedRule = RulesGrid.SelectedIndex;
+            if (selectedRule > -1 && Rules[selectedRule].Symbol != string.Empty)
             {
-                var newCell = new Cell();
-                Tape.tape.Insert(0, newCell);
-                Tape.visibleTapeFragment.Insert(0, newCell);
+                Rules.RemoveAt(selectedRule);
             }
-            else
-            {
-                Tape.visibleTapeFragment.Insert(0, Tape.tape[Tape.start - 1]);
-                Tape.start--;
-                Tape.finish--;
-            }
-            Tape.visibleTapeFragment.RemoveAt(capacity);
         }
 
-        public void ToRightButton_Click(object sender, RoutedEventArgs e)
+        public void AddRule(string value) => Rules.Add(new Rule(value, StatesCount));
+
+        public void StartButton_Click(object sender, RoutedEventArgs e) => new Thread(Play).Start();
+
+        private void Play()
         {
-            if (Tape.finish == Tape.tape.Count)
+            Tape.currentState = 1;
+            this.Dispatcher.Invoke(() => DebugButton.IsEnabled = false);
+            isRunning = true;
+            this.Dispatcher.Invoke(() => ChangeEnability());
+            while (Tape.currentState != 0)
             {
-                var newCell = new Cell();
-                Tape.tape.Add(newCell);
-                Tape.visibleTapeFragment.Add(newCell);
+                this.Dispatcher.Invoke(() => MoveNext());
+                if (isRunning && Tape.currentState != 0)
+                {
+                    Thread.Sleep(400);
+                }
+                else
+                {
+                    break;
+                }
             }
-            else
-            {
-                Tape.visibleTapeFragment.Add(Tape.tape[Tape.finish]);
-            }
-            Tape.visibleTapeFragment.RemoveAt(0);
-            Tape.start++;
-            Tape.finish++;
+            isRunning = false;
+            MessageBox.Show("Programm executed");
+            this.Dispatcher.Invoke(() => DebugButton.IsEnabled = true);
+            this.Dispatcher.Invoke(() => ChangeEnability());
         }
 
-        public void RulesGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        private void MoveNext()
+        {
+            var currentSymbol = Tape[Tape.start];
+            var currentRule = Rules.FirstOrDefault(r => r.Symbol == currentSymbol) ?? Rules.FirstOrDefault(r => r.Symbol == string.Empty);
+            if (currentRule == null)
+            {
+                Tape.currentState = 0;
+                ChangeEnability();
+                return;
+            }
+            var currentMove = currentRule.Moves[Tape.currentState - 1];
+            Tape[Tape.start] = currentMove.NewValue;
+            Tape.currentState = currentMove.NewState;
+
+            switch (currentMove.Direction)
+            {
+                case MoveDirection.Left:
+                    MoveLeft();
+                    break;
+                case MoveDirection.Right:
+                    MoveRight();
+                    break;
+                case MoveDirection.None:
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private void ChangeEnability()
+        {
+            StartButton.IsEnabled = !isRunning;
+            DebugButton.IsEnabled = !isRunning;
+            RulesGrid.IsReadOnly = isRunning;
+            VisibleTapeGrid.IsReadOnly = isRunning;
+            AddRuleButton.IsEnabled = !isRunning;
+            AddStateButton.IsEnabled = !isRunning;
+            RemoveRuleButton.IsEnabled = !isRunning;
+            RemoveStateButton.IsEnabled = !isRunning;
+            ToLeftButton.IsEnabled = !isRunning;
+            ToRightButton.IsEnabled = !isRunning;
+        }
+
+        private void StopButton_Click(object sender, RoutedEventArgs e)
+        {
+            isRunning = false;
+            ChangeEnability();
+        }
+
+        private void DebugButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!isRunning)
+            {
+                isRunning = true;
+                ChangeEnability();
+                Tape.currentState = 1;
+            }
+            else if (Tape.currentState == 0)
+            {
+                MessageBox.Show("Program executed");
+                return;
+            }
+            MoveNext();
+        }
+
+        private void VisibleTapeGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
             e.Cancel = true;
-
-            if ((e?.EditingElement) is TextBox tb)
+            int index = VisibleTapeGrid.ItemContainerGenerator.IndexFromContainer(e.Row);
+            if (index > -1 && index < tapeCapacity && e.EditingElement is TextBox tb)
             {
-                var x = e.Column.DisplayIndex;
-                var y = e.Row.GetIndex();
-                var newText = tb.Text;
-
-                var currentMove = Rules[y].Moves[x];
-                if (!currentMove.TrySetRawValue(newText))
-                {
-                    MessageBox.Show("Wrong value");
-                }
+                Tape.VisibleTapeFragment[index] = tb.Text;
+                ColumnsCollection[index][0] = new Cell(Tape.VisibleTapeFragment[index]);
+                Tape[Tape.start + index] = Tape.VisibleTapeFragment[index];
             }
         }
     }
